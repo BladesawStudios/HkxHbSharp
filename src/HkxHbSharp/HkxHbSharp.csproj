@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>HkxHbSharp</RootNamespace>
+    <AssemblyName>HkxHbSharp</AssemblyName>
+    <Version>0.1.0</Version>
+    <Authors>Aiden A</Authors>
+    <Description>Reader and solver for TotK Phive helper bones (.bphhb): procedural driver-to-driven bone rigs.</Description>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- A .bphhb is an AAMP parameter archive inside a Phive container; AampSharp reads the archive. -->
+    <ProjectReference Include="..\..\..\UMiiSharp\lib\AampSharp\src\AampSharp\AampSharp.csproj" />
+  </ItemGroup>
+</Project>
