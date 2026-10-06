@@ -20,6 +20,10 @@ public sealed class HelperBoneSolver
     private readonly float[] _curves;
     private readonly float[] _outputs;
     private readonly Matrix4x4[] _poses;
+    private readonly bool[] _poseValid;
+
+    // Which bones of the pose were supplied; empty means all of them. Set for the length of one Solve.
+    private bool[] _available = [];
 
     public HelperBoneData Data { get; }
 
@@ -32,15 +36,25 @@ public sealed class HelperBoneSolver
         _curves = new float[data.ConnectionCurves.Count];
         _outputs = new float[data.Outputs.Count];
         _poses = new Matrix4x4[data.PoseDrivens.Count];
+        _poseValid = new bool[data.PoseDrivens.Count];
     }
+
+    private bool Has(int bone) => bone >= 0 && (_available.Length == 0 ? true : bone < _available.Length && _available[bone]);
 
     /// <summary>
     /// Solves the rig in place. <paramref name="transforms"/> holds the bones' world matrices numbered as
     /// <see cref="HelperBoneData.Bones"/> numbers them; the driven ones are overwritten.
     /// </summary>
-    public void Solve(Matrix4x4[] transforms)
+    /// <param name="available">
+    /// Which of those bones were really supplied. A rig can name bones its host does not have - an armour's helper bones
+    /// read the body it is worn on (<c>Link:Waist</c>), which the armour alone lacks. A driver on a missing bone reads as
+    /// at rest, and a pose anchored to one drives nothing, so the bones stay where the animation has them rather than
+    /// being posed from a matrix that was never there. Null or empty means every bone is there.
+    /// </param>
+    public void Solve(Matrix4x4[] transforms, bool[]? available = null)
     {
         ArgumentNullException.ThrowIfNull(transforms);
+        _available = available ?? [];
 
         for (int d = 0; d < Data.DriverBones.Count; d++) ReadDriver(d, transforms);
 
@@ -67,7 +81,7 @@ public sealed class HelperBoneSolver
             _outputs[o] = sum;
         }
 
-        for (int p = 0; p < Data.PoseDrivens.Count; p++) _poses[p] = BuildPose(Data.PoseDrivens[p], transforms);
+        for (int p = 0; p < Data.PoseDrivens.Count; p++) _poses[p] = BuildPose(Data.PoseDrivens[p], transforms, out _poseValid[p]);
 
         foreach (DrivenBone driven in Data.DrivenBones) Drive(driven, transforms);
     }
@@ -78,8 +92,8 @@ public sealed class HelperBoneSolver
         DriverBone driver = Data.DriverBones[d];
         _roll[d] = _bendH[d] = _bendV[d] = 0f;
 
-        if (driver.BoneId < 0 || driver.BoneId >= transforms.Length
-            || driver.BaseBoneId < 0 || driver.BaseBoneId >= transforms.Length) return;
+        if (driver.BoneId >= transforms.Length || driver.BaseBoneId >= transforms.Length
+            || !Has(driver.BoneId) || !Has(driver.BaseBoneId)) return;
         if (!Matrix4x4.Invert(transforms[driver.BaseBoneId], out Matrix4x4 baseInverse)) return;
 
         Matrix4x4.Decompose(transforms[driver.BoneId] * baseInverse, out _, out Quaternion relative, out _);
@@ -105,8 +119,12 @@ public sealed class HelperBoneSolver
         _bendV[d] = MathF.Atan2(-Vector3.Dot(swung, up), Vector3.Dot(swung, aim));
     }
 
-    private Matrix4x4 BuildPose(PoseDriven pose, Matrix4x4[] transforms)
+    private Matrix4x4 BuildPose(PoseDriven pose, Matrix4x4[] transforms, out bool valid)
     {
+        // A pose anchored to a bone that is not there cannot be placed; one with no base bone is placed at the origin.
+        valid = pose.BaseBoneId < 0 || (pose.BaseBoneId < transforms.Length && Has(pose.BaseBoneId));
+        if (!valid) return Matrix4x4.Identity;
+
         Vector3 aim = Vector3.Normalize(pose.AimAxis);
         Vector3 up = Vector3.Normalize(pose.UpAxis);
         Vector3 side = Vector3.Normalize(Vector3.Cross(aim, up));
@@ -124,10 +142,10 @@ public sealed class HelperBoneSolver
 
     private void Drive(DrivenBone driven, Matrix4x4[] transforms)
     {
-        if (driven.BoneId < 0 || driven.BoneId >= transforms.Length) return;
+        if (driven.BoneId < 0 || driven.BoneId >= transforms.Length || !Has(driven.BoneId)) return;
 
-        bool rotates = driven.RotateDrivenType == 0 && driven.RotateDrivenId >= 0 && driven.RotateDrivenId < _poses.Length;
-        bool translates = driven.TranslateDrivenType == 0 && driven.TranslateDrivenId >= 0 && driven.TranslateDrivenId < _poses.Length;
+        bool rotates = driven.RotateDrivenType == 0 && driven.RotateDrivenId >= 0 && driven.RotateDrivenId < _poses.Length && _poseValid[driven.RotateDrivenId];
+        bool translates = driven.TranslateDrivenType == 0 && driven.TranslateDrivenId >= 0 && driven.TranslateDrivenId < _poses.Length && _poseValid[driven.TranslateDrivenId];
         if (!rotates && !translates) return;
 
         // One pose giving both: the bone takes it whole, scale and all.
