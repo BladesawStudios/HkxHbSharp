@@ -11,10 +11,11 @@
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <HkxHbLibRoot Condition="'$(HkxHbLibRoot)' == ''">$(MSBuildThisFileDirectory)..\..\lib</HkxHbLibRoot>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- A .bphhb is an AAMP parameter archive inside a Phive container; AampSharp reads the archive. -->
-    <ProjectReference Include="..\..\..\UMiiSharp\lib\AampSharp\src\AampSharp\AampSharp.csproj" />
+    <ProjectReference Include="$(HkxHbLibRoot)\AampSharp\src\AampSharp\AampSharp.csproj" />
   </ItemGroup>
 </Project>
