@@ -1,0 +1,3 @@
+[submodule "lib/AampSharp"]
+	path = lib/AampSharp
+	url = https://github.com/BladesawStudios/AampSharp
